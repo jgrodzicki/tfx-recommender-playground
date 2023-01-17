@@ -1,0 +1,17 @@
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line_length = 120
+
+[tool.mypy]
+strict = true
+exclude = [
+    ".venv"
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "kaggle.*"
+]
+ignore_missing_imports = true
