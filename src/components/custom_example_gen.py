@@ -7,7 +7,7 @@ import pandas as pd
 import tensorflow as tf
 from tfx.dsl.components.base import base_component, base_executor, executor_spec
 from tfx.types import artifact_utils, standard_artifacts
-from tfx.types.artifact import Artifact
+from tfx.types.artifact import Artifact, Property, PropertyType
 from tfx.types.channel import Channel
 from tfx.types.component_spec import ChannelParameter, ComponentSpec
 from tfx.types.standard_artifacts import _TfxArtifact
@@ -84,6 +84,10 @@ class Executor(base_executor.BaseExecutor):
         train_df = merged_df.sample(frac=0.7)
         eval_df = merged_df.drop(train_df.index)
 
+        size_artifact = artifact_utils.get_single_instance(output_dict["size"])
+        size_artifact.train = len(train_df)
+        size_artifact.eval = len(eval_df)
+
         examples_artifact_uri = artifact_utils.get_single_uri(output_dict["examples"])
 
         artifact = artifact_utils.get_single_instance(output_dict["examples"])
@@ -102,6 +106,14 @@ class Executor(base_executor.BaseExecutor):
 
 
 class SizeArtifact(_TfxArtifact):
+    """
+    Artifact introduced just as an example. Could be retrieved e.g. using ML Metadata:
+    > import ml_metadata as mlmd
+
+    > metadata_connection_config=sqlite_metadata_connection_config(path_to_metadata_db_file)
+    > store = mlmd.MetadataStore(metadata_connection_config)
+    > store.get_artifacts_by_type(SizeArtifact.TYPE_NAME)
+    """
     TYPE_NAME: str = "SizeArtifact"  # type: ignore[assignment]  # In base class defined as `None`
     PROPERTIES = {
         "train": SIZE_PROPERTY,
@@ -112,7 +124,10 @@ class SizeArtifact(_TfxArtifact):
 class CustomExampleGenSpec(ComponentSpec):  # type: ignore[no-untyped-call]
     PARAMETERS = {}
     INPUTS = {}
-    OUTPUTS = {"examples": ChannelParameter(type=standard_artifacts.Examples)}
+    OUTPUTS = {
+        "examples": ChannelParameter(type=standard_artifacts.Examples),
+        "size": ChannelParameter(type=SizeArtifact),
+    }
 
 
 class CustomExampleGen(base_component.BaseComponent):
@@ -120,5 +135,8 @@ class CustomExampleGen(base_component.BaseComponent):
     EXECUTOR_SPEC = executor_spec.ExecutorClassSpec(Executor)
 
     def __init__(self) -> None:
-        spec = CustomExampleGenSpec(examples=Channel(type=standard_artifacts.Examples))  # type: ignore[no-untyped-call]
+        spec = CustomExampleGenSpec(
+            examples=Channel(type=standard_artifacts.Examples),
+            size=Channel(type=SizeArtifact),
+        )  # type: ignore[no-untyped-call]
         super().__init__(spec=spec)
