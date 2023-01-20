@@ -4,13 +4,8 @@ from typing import Any, Dict
 import tensorflow as tf
 import tensorflow_transform as tft
 
-from src.components.consts import (
-    CATEGORICAL_FEATURES,
-    LABEL_KEY,
-    NUMERICAL_FEATURES,
-    TEXT_FEATURES,
-    VOCABULARY_FILE_PREFIX,
-)
+from src.components.common import create_vocab_filename
+from src.components.consts import CATEGORICAL_FEATURES, LABEL_KEY, NUMERICAL_FEATURES, TEXT_FEATURES
 
 MODULE_FILE = os.path.abspath(__file__)
 
@@ -20,7 +15,7 @@ def preprocessing_fn(inputs: Dict[str, Any]) -> Dict[str, Any]:
     for feature in CATEGORICAL_FEATURES:
         outputs[feature] = tft.compute_and_apply_vocabulary(
             inputs[feature],
-            vocab_filename=VOCABULARY_FILE_PREFIX + feature,
+            vocab_filename=create_vocab_filename(feature_name=feature),
             num_oov_buckets=1,
         )
 
@@ -32,7 +27,7 @@ def preprocessing_fn(inputs: Dict[str, Any]) -> Dict[str, Any]:
         outputs[feature] = preprocessed
 
         # Vocabulary will be needed later on during the training
-        tft.compute_and_apply_vocabulary(preprocessed, vocab_filename="vocabulary_" + feature)
+        tft.compute_and_apply_vocabulary(preprocessed, vocab_filename=create_vocab_filename(feature_name=feature))
 
     outputs[LABEL_KEY] = tft.scale_to_z_score(inputs[LABEL_KEY])
 
