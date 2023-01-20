@@ -1,9 +1,13 @@
 from tfx.components.schema_gen.component import SchemaGen
 from tfx.components.statistics_gen.component import StatisticsGen
+from tfx.components.trainer.component import Trainer
 from tfx.components.transform.component import Transform
+from tfx.v1.proto import EvalArgs, TrainArgs
 
-from src.components import transform
+from src.components.consts import EPOCHS_CONFIG_FIELD_NAME
 from src.components.custom_example_gen import CustomExampleGen
+from src.components.trainer import MODULE_FILE as trainer_module_file
+from src.components.transform import MODULE_FILE as transform_module_file
 
 
 class PipelineFactory:
@@ -24,6 +28,17 @@ class PipelineFactory:
         return Transform(
             examples=example_gen.outputs["examples"],
             schema=schema_gen.outputs["schema"],
-            module_file=transform.MODULE_FILE,
-            materialize=False,
+            module_file=transform_module_file,
+            materialize=True,
+        )
+
+    @staticmethod
+    def _create_trainer(transform: Transform) -> Trainer:
+        return Trainer(
+            transform_graph=transform.outputs["transform_graph"],
+            examples=transform.outputs["transformed_examples"],
+            train_args=TrainArgs(num_steps=10),
+            eval_args=EvalArgs(num_steps=10),
+            module_file=trainer_module_file,
+            custom_config={EPOCHS_CONFIG_FIELD_NAME: 10},
         )
