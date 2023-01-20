@@ -1,4 +1,5 @@
 tfx==1.12.0
+tensorflow==2.11.0
 tensorflow-recommenders==0.7.2
 tensor-annotations-tensorflow-stubs==2.0.2
 kaggle==1.5.12

@@ -1,5 +1,6 @@
 [tool.isort]
 profile = "black"
+line_length = 120
 
 [tool.black]
 line_length = 120
@@ -12,6 +13,7 @@ exclude = [
 
 [[tool.mypy.overrides]]
 module = [
-    "kaggle.*"
+    "kaggle.*",
+    "tensorflow_transform.*"
 ]
 ignore_missing_imports = true
