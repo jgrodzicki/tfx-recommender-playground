@@ -1,8 +1,9 @@
+from tfx.components.pusher.component import Pusher
 from tfx.components.schema_gen.component import SchemaGen
 from tfx.components.statistics_gen.component import StatisticsGen
 from tfx.components.trainer.component import Trainer
 from tfx.components.transform.component import Transform
-from tfx.v1.proto import EvalArgs, TrainArgs
+from tfx.v1.proto import EvalArgs, PushDestination, TrainArgs
 
 from src.components.consts import EPOCHS_CONFIG_FIELD_NAME
 from src.components.custom_evaluator import CustomEvaluator
@@ -51,4 +52,12 @@ class PipelineFactory:
             metric_threshold=metric_threshold,
             model=trainer.outputs["model"],
             model_run=trainer.outputs["model_run"],
+        )
+
+    @staticmethod
+    def _create_pusher(trainer: Trainer, evaluator: CustomEvaluator, serving_model_dir: str) -> Pusher:
+        return Pusher(
+            model=trainer.outputs["model"],
+            model_blessing=evaluator.outputs["blessing"],
+            push_destination=PushDestination(filesystem=PushDestination.Filesystem(base_directory=serving_model_dir)),
         )
