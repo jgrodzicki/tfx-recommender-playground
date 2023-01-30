@@ -15,6 +15,7 @@ exclude = [
 module = [
     "kaggle.*",
     "ml_metadata.*",
+    "tensorflow_model_analysis.*",
     "tensorflow_transform.*",
     "tensorflow_recommenders.*",
     "tfx_bsl.public.*"

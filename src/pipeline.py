@@ -5,6 +5,7 @@ from tfx.components.transform.component import Transform
 from tfx.v1.proto import EvalArgs, TrainArgs
 
 from src.components.consts import EPOCHS_CONFIG_FIELD_NAME
+from src.components.custom_evaluator import CustomEvaluator
 from src.components.custom_example_gen import CustomExampleGen
 from src.components.trainer import MODULE_FILE as trainer_module_file
 from src.components.transform import MODULE_FILE as transform_module_file
@@ -41,4 +42,13 @@ class PipelineFactory:
             eval_args=EvalArgs(num_steps=10),
             module_file=trainer_module_file,
             custom_config={EPOCHS_CONFIG_FIELD_NAME: 10},
+        )
+
+    @staticmethod
+    def _create_evaluator(trainer: Trainer, metric_name: str, metric_threshold: float) -> CustomEvaluator:
+        return CustomEvaluator(
+            metric_name=metric_name,
+            metric_threshold=metric_threshold,
+            model=trainer.outputs["model"],
+            model_run=trainer.outputs["model_run"],
         )
