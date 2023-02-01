@@ -13,7 +13,7 @@ from tfx.types.component_spec import ChannelParameter, ComponentSpec
 from tfx.types.standard_artifacts import _TfxArtifact
 from tqdm import tqdm
 
-from src.components.consts import CATEGORICAL_FEATURES, LABEL_KEY, NUMERICAL_FEATURES, TEXT_FEATURES
+from src.components.common import REQUIRED_COLUMNS
 
 KAGGLE_DATASET = "shuyangli94/food-com-recipes-and-user-interactions"
 RAW_RECIPES_FILE_PATH = Path("RAW_recipes.csv")
@@ -79,8 +79,7 @@ class Executor(base_executor.BaseExecutor):
             left_on="id",
             right_on="recipe_id",
         )
-        required_columns = NUMERICAL_FEATURES + CATEGORICAL_FEATURES + TEXT_FEATURES + [LABEL_KEY]
-        merged_df = merged_df_full[required_columns]
+        merged_df = merged_df_full[REQUIRED_COLUMNS]
         merged_df = merged_df.dropna(how="any")
 
         train_df = merged_df.sample(frac=0.7)

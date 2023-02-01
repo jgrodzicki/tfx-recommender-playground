@@ -4,8 +4,7 @@ import tensorflow as tf
 import tensorflow_recommenders as tfrs
 from tensorflow_transform import TFTransformOutput
 
-from src.components.common import create_vocab_filename
-from src.components.consts import RECIPE_NAME_FEATURE, USER_ID_FEATURE
+from src.components.common import RECIPE_NAME_FEATURE, USER_ID_FEATURE, create_vocab_filename
 
 
 class RecommenderModel(tfrs.Model):  # type: ignore[misc]  # Class cannot subclass "Model" (has type "Any")

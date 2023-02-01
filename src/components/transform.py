@@ -4,8 +4,13 @@ from typing import Any, Dict
 import tensorflow as tf
 import tensorflow_transform as tft
 
-from src.components.common import create_vocab_filename
-from src.components.consts import CATEGORICAL_FEATURES, LABEL_KEY, NUMERICAL_FEATURES, TEXT_FEATURES
+from src.components.common import (
+    CATEGORICAL_FEATURES,
+    LABEL_KEY,
+    NUMERICAL_FEATURES,
+    TEXT_FEATURES,
+    create_vocab_filename,
+)
 
 MODULE_FILE = os.path.abspath(__file__)
 

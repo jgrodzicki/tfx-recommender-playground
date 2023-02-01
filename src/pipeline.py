@@ -10,7 +10,7 @@ from tfx.orchestration.metadata import ConnectionConfigType
 from tfx.orchestration.pipeline import Pipeline
 from tfx.v1.proto import EvalArgs, PushDestination, TrainArgs
 
-from src.components.consts import EPOCHS_CONFIG_FIELD_NAME
+from src.components.common import EPOCHS_CONFIG_FIELD_NAME
 from src.components.custom_evaluator import CustomEvaluator
 from src.components.custom_example_gen import CustomExampleGen
 from src.components.trainer import MODULE_FILE as trainer_module_file

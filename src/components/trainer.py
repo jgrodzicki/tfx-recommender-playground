@@ -7,8 +7,7 @@ from tensorflow_transform import TFTransformOutput
 from tfx.components.trainer.fn_args_utils import DataAccessor, FnArgs
 from tfx_bsl.public import tfxio
 
-from src.components.common import create_vocab_filename
-from src.components.consts import EPOCHS_CONFIG_FIELD_NAME, RECIPE_NAME_FEATURE
+from src.components.common import EPOCHS_CONFIG_FIELD_NAME, RECIPE_NAME_FEATURE, create_vocab_filename
 from src.model import RecommenderModelFactory
 
 MODULE_FILE = os.path.abspath(__file__)
