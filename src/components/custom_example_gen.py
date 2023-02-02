@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import kaggle
 import pandas as pd
@@ -9,7 +9,7 @@ from tfx.dsl.components.base import base_component, base_executor, executor_spec
 from tfx.types import artifact_utils, standard_artifacts
 from tfx.types.artifact import Artifact, Property, PropertyType
 from tfx.types.channel import Channel
-from tfx.types.component_spec import ChannelParameter, ComponentSpec
+from tfx.types.component_spec import ChannelParameter, ComponentSpec, ExecutionParameter
 from tfx.types.standard_artifacts import _TfxArtifact
 from tqdm import tqdm
 
@@ -82,6 +82,10 @@ class Executor(base_executor.BaseExecutor):
         merged_df = merged_df_full[REQUIRED_COLUMNS]
         merged_df = merged_df.dropna(how="any")
 
+        limit_dataset_size = exec_properties["limit_dataset_size"]
+        if limit_dataset_size is not None:
+            merged_df = merged_df.iloc[:limit_dataset_size]
+
         train_df = merged_df.sample(frac=0.7)
         eval_df = merged_df.drop(train_df.index)
 
@@ -115,6 +119,7 @@ class SizeArtifact(_TfxArtifact):
     > store = mlmd.MetadataStore(metadata_connection_config)
     > store.get_artifacts_by_type(SizeArtifact.TYPE_NAME)
     """
+
     TYPE_NAME: str = "SizeArtifact"  # type: ignore[assignment]  # In base class defined as `None`
     PROPERTIES = {
         "train": SIZE_PROPERTY,
@@ -123,7 +128,7 @@ class SizeArtifact(_TfxArtifact):
 
 
 class CustomExampleGenSpec(ComponentSpec):  # type: ignore[no-untyped-call]
-    PARAMETERS = {}
+    PARAMETERS = {"limit_dataset_size": ExecutionParameter(type=int, optional=True)}  # type: ignore[no-untyped-call]
     INPUTS = {}
     OUTPUTS = {
         "examples": ChannelParameter(type=standard_artifacts.Examples),
@@ -135,9 +140,10 @@ class CustomExampleGen(base_component.BaseComponent):
     SPEC_CLASS = CustomExampleGenSpec
     EXECUTOR_SPEC = executor_spec.ExecutorClassSpec(Executor)
 
-    def __init__(self) -> None:
+    def __init__(self, limit_dataset_size: Optional[int]) -> None:
         spec = CustomExampleGenSpec(
             examples=Channel(type=standard_artifacts.Examples),
             size=Channel(type=SizeArtifact),
+            limit_dataset_size=limit_dataset_size,
         )  # type: ignore[no-untyped-call]
         super().__init__(spec=spec)

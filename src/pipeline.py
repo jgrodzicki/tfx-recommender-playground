@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from tfx.components.base.base_node import BaseNode
 from tfx.components.pusher.component import Pusher
@@ -19,8 +19,8 @@ from src.components.transform import MODULE_FILE as transform_module_file
 
 class PipelineFactory:
     @staticmethod
-    def _create_example_gen() -> CustomExampleGen:
-        return CustomExampleGen()
+    def _create_example_gen(limit_dataset_size: Optional[int]) -> CustomExampleGen:
+        return CustomExampleGen(limit_dataset_size=limit_dataset_size)
 
     @staticmethod
     def _create_statistics_gen(example_gen: CustomExampleGen) -> StatisticsGen:
@@ -75,8 +75,9 @@ class PipelineFactory:
         serving_model_dir: str,
         metric_name: str,
         metric_threshold: float,
+        limit_dataset_size: Optional[int] = None,
     ) -> Pipeline:
-        example_gen = PipelineFactory._create_example_gen()
+        example_gen = PipelineFactory._create_example_gen(limit_dataset_size=limit_dataset_size)
         statistics_gen = PipelineFactory._create_statistics_gen(example_gen=example_gen)
         schema_gen = PipelineFactory._create_schema_gen(statistics_gen=statistics_gen)
         transform = PipelineFactory._create_transform(example_gen=example_gen, schema_gen=schema_gen)
