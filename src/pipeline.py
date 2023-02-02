@@ -40,14 +40,14 @@ class PipelineFactory:
         )
 
     @staticmethod
-    def _create_trainer(transform: Transform) -> Trainer:
+    def _create_trainer(transform: Transform, epochs: int) -> Trainer:
         return Trainer(
             transform_graph=transform.outputs["transform_graph"],
             examples=transform.outputs["transformed_examples"],
             train_args=TrainArgs(num_steps=10),
             eval_args=EvalArgs(num_steps=10),
             module_file=trainer_module_file,
-            custom_config={EPOCHS_CONFIG_FIELD_NAME: 10},
+            custom_config={EPOCHS_CONFIG_FIELD_NAME: epochs},
         )
 
     @staticmethod
@@ -76,12 +76,13 @@ class PipelineFactory:
         metric_name: str,
         metric_threshold: float,
         limit_dataset_size: Optional[int] = None,
+        epochs: int = 10,
     ) -> Pipeline:
         example_gen = PipelineFactory._create_example_gen(limit_dataset_size=limit_dataset_size)
         statistics_gen = PipelineFactory._create_statistics_gen(example_gen=example_gen)
         schema_gen = PipelineFactory._create_schema_gen(statistics_gen=statistics_gen)
         transform = PipelineFactory._create_transform(example_gen=example_gen, schema_gen=schema_gen)
-        trainer = PipelineFactory._create_trainer(transform=transform)
+        trainer = PipelineFactory._create_trainer(transform=transform, epochs=epochs)
         evaluator = PipelineFactory._create_evaluator(
             trainer=trainer,
             metric_name=metric_name,
