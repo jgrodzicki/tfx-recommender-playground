@@ -1,6 +1,7 @@
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import kaggle
 import pandas as pd
@@ -16,12 +17,24 @@ from tqdm import tqdm
 from src.components.common import REQUIRED_COLUMNS
 
 KAGGLE_DATASET = "shuyangli94/food-com-recipes-and-user-interactions"
-RAW_RECIPES_FILE_PATH = Path("RAW_recipes.csv")
-RAW_INTERACTIONS_FILE_PATH = Path("RAW_interactions.csv")
+RAW_RECIPES_FILENAME = Path("RAW_recipes.csv")
+RAW_INTERACTIONS_FILENAME = Path("RAW_interactions.csv")
 
 DATA_FOLDER = Path("data")
 
+TRAIN_SET_SIZE_FRAC = 0.7
+TRAIN_SPLIT_NAME = "train"
+EVAL_SPLIT_NAME = "eval"
+
+
 SIZE_PROPERTY = Property(type=PropertyType.INT)  # type: ignore[no-untyped-call]
+
+
+@dataclass(frozen=True)
+class SpecFields:
+    LIMIT_DATASET_SIZE = "limit_dataset_size"
+    EXAMPLES = "examples"
+    SIZE = "size"
 
 
 def _dict_to_example_single(instance: Dict[str, Any]) -> tf.train.Example:
@@ -58,22 +71,21 @@ def convert_and_write_tfrecords(df: pd.DataFrame, examples_artifact_uri: str, sp
 
 
 class Executor(base_executor.BaseExecutor):
-    def Do(
-        self,
-        input_dict: Dict[str, List[Artifact]],
-        output_dict: Dict[str, List[Artifact]],
-        exec_properties: Dict[str, Any],
-    ) -> None:
-        for filename in [RAW_RECIPES_FILE_PATH, RAW_INTERACTIONS_FILE_PATH]:
+    @staticmethod
+    def _download_files() -> None:
+        for filename in [RAW_RECIPES_FILENAME, RAW_INTERACTIONS_FILENAME]:
             kaggle.api.dataset_download_file(
                 dataset=KAGGLE_DATASET,
                 file_name=str(filename),
                 path=str(DATA_FOLDER),
             )
 
-        recipes_df = pd.read_csv(str(DATA_FOLDER / RAW_RECIPES_FILE_PATH) + ".zip")
-        interactions_df = pd.read_csv(str(DATA_FOLDER / RAW_INTERACTIONS_FILE_PATH) + ".zip")
+    @staticmethod
+    def _read_file(filename: Path) -> pd.DataFrame:
+        return pd.read_csv(str(DATA_FOLDER / filename) + ".zip")
 
+    @staticmethod
+    def _merge_and_clean_dfs(recipes_df: pd.DataFrame, interactions_df: pd.DataFrame) -> pd.DataFrame:
         merged_df_full = recipes_df.merge(
             right=interactions_df,
             left_on="id",
@@ -81,32 +93,60 @@ class Executor(base_executor.BaseExecutor):
         )
         merged_df = merged_df_full[REQUIRED_COLUMNS]
         merged_df = merged_df.dropna(how="any")
+        return merged_df
 
-        limit_dataset_size = exec_properties["limit_dataset_size"]
+    @staticmethod
+    def _get_train_eval_split(merged_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        train_df = merged_df.sample(frac=TRAIN_SET_SIZE_FRAC)
+        eval_df = merged_df.drop(train_df.index)
+        return train_df, eval_df
+
+    @staticmethod
+    def _get_single_artifact(artifacts: List[Artifact]) -> Artifact:
+        return artifact_utils.get_single_instance(artifacts)
+
+    @staticmethod
+    def _set_size_artifact(size_artifact: Artifact, train_df_size: int, eval_df_size: int) -> None:
+        size_artifact.train = train_df_size
+        size_artifact.eval = eval_df_size
+
+    @staticmethod
+    def _set_examples_artifact(examples_artifact: Artifact) -> None:
+        examples_artifact.split_names = artifact_utils.encode_split_names([TRAIN_SPLIT_NAME, EVAL_SPLIT_NAME])
+
+    def Do(
+        self,
+        input_dict: Dict[str, List[Artifact]],
+        output_dict: Dict[str, List[Artifact]],
+        exec_properties: Dict[str, Any],
+    ) -> None:
+        self._download_files()
+
+        recipes_df = self._read_file(filename=RAW_RECIPES_FILENAME)
+        interactions_df = self._read_file(filename=RAW_INTERACTIONS_FILENAME)
+
+        merged_df = self._merge_and_clean_dfs(recipes_df=recipes_df, interactions_df=interactions_df)
+        limit_dataset_size = exec_properties[SpecFields.LIMIT_DATASET_SIZE]
         if limit_dataset_size is not None:
             merged_df = merged_df.iloc[:limit_dataset_size]
 
-        train_df = merged_df.sample(frac=0.7)
-        eval_df = merged_df.drop(train_df.index)
+        train_df, eval_df = self._get_train_eval_split(merged_df=merged_df)
 
-        size_artifact = artifact_utils.get_single_instance(output_dict["size"])
-        size_artifact.train = len(train_df)
-        size_artifact.eval = len(eval_df)
+        size_artifact = self._get_single_artifact(artifacts=output_dict[SpecFields.SIZE])
+        self._set_size_artifact(size_artifact=size_artifact, train_df_size=len(train_df), eval_df_size=len(eval_df))
 
-        examples_artifact_uri = artifact_utils.get_single_uri(output_dict["examples"])
-
-        artifact = artifact_utils.get_single_instance(output_dict["examples"])
-        artifact.split_names = artifact_utils.encode_split_names(["train", "eval"])
+        examples_artifact = self._get_single_artifact(artifacts=output_dict[SpecFields.EXAMPLES])
+        self._set_examples_artifact(examples_artifact=examples_artifact)
 
         convert_and_write_tfrecords(
             df=train_df,
-            examples_artifact_uri=examples_artifact_uri,
-            split_name="train",
+            examples_artifact_uri=examples_artifact.uri,
+            split_name=TRAIN_SPLIT_NAME,
         )
         convert_and_write_tfrecords(
             df=eval_df,
-            examples_artifact_uri=examples_artifact_uri,
-            split_name="eval",
+            examples_artifact_uri=examples_artifact.uri,
+            split_name=EVAL_SPLIT_NAME,
         )
 
 
@@ -128,11 +168,13 @@ class SizeArtifact(_TfxArtifact):
 
 
 class CustomExampleGenSpec(ComponentSpec):  # type: ignore[no-untyped-call]
-    PARAMETERS = {"limit_dataset_size": ExecutionParameter(type=int, optional=True)}  # type: ignore[no-untyped-call]
+    PARAMETERS = {
+        SpecFields.LIMIT_DATASET_SIZE: ExecutionParameter(type=int, optional=True),  # type: ignore[no-untyped-call]
+    }
     INPUTS = {}
     OUTPUTS = {
-        "examples": ChannelParameter(type=standard_artifacts.Examples),
-        "size": ChannelParameter(type=SizeArtifact),
+        SpecFields.EXAMPLES: ChannelParameter(type=standard_artifacts.Examples),
+        SpecFields.SIZE: ChannelParameter(type=SizeArtifact),
     }
 
 
@@ -142,8 +184,10 @@ class CustomExampleGen(base_component.BaseComponent):
 
     def __init__(self, limit_dataset_size: Optional[int]) -> None:
         spec = CustomExampleGenSpec(
-            examples=Channel(type=standard_artifacts.Examples),
-            size=Channel(type=SizeArtifact),
-            limit_dataset_size=limit_dataset_size,
+            **{
+                SpecFields.LIMIT_DATASET_SIZE: limit_dataset_size,
+                SpecFields.EXAMPLES: Channel(type=standard_artifacts.Examples),
+                SpecFields.SIZE: Channel(type=SizeArtifact),
+            }
         )  # type: ignore[no-untyped-call]
         super().__init__(spec=spec)
