@@ -1,2 +1,9 @@
 .idea
 .venv
+**/__pycache__
+
+# Default folders created on execution
+data
+metadata
+pipeline_root
+serving_model_dir
