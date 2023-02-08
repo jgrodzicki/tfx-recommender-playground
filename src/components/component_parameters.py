@@ -4,6 +4,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class ExampleGenParameters:
+    should_use_local_sample_data: bool
     limit_dataset_size: Optional[int]
 
 

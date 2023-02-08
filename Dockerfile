@@ -11,5 +11,6 @@ COPY requirements.txt requirements.txt
 
 RUN pip install -r requirements.txt
 
+COPY sample_data sample_data
 COPY src src
 COPY main.py main.py

@@ -26,7 +26,10 @@ from src.components.transform import MODULE_FILE as TRANSFORM_MODULE_FILE
 class PipelineFactory:
     @staticmethod
     def _create_example_gen(example_gen_parameters: ExampleGenParameters) -> CustomExampleGen:
-        return CustomExampleGen(limit_dataset_size=example_gen_parameters.limit_dataset_size)
+        return CustomExampleGen(
+            should_use_local_sample_data=example_gen_parameters.should_use_local_sample_data,
+            limit_dataset_size=example_gen_parameters.limit_dataset_size,
+        )
 
     @staticmethod
     def _create_statistics_gen(example_gen: CustomExampleGen) -> StatisticsGen:
@@ -113,6 +116,7 @@ class PipelineFactory:
         )
 
         components: List[BaseNode] = [example_gen, statistics_gen, schema_gen, transform, trainer, evaluator, pusher]
+
         return Pipeline(
             pipeline_name=pipeline_name,
             pipeline_root=pipeline_root,

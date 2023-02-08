@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class CommandLineArgs:
+    should_use_local_sample_data: bool
     pipeline_name: str
     pipeline_root: str
     metadata_path: str
@@ -20,6 +21,13 @@ class Parser:
     @staticmethod
     def _create_parser() -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--use-local-sample-data",
+            action="store_true",
+            help="Specifies source of the data used. When the flag is provided, a small sample stored locally in the "
+            "repo will be used. Otherwise the data will get fetched from Kaggle. Note: In order to fetch from "
+            "Kaggle API, credentials have to be stored in the ~/.kaggle/kaggle.json file",
+        )
         parser.add_argument("--pipeline-name", type=str, default="pipeline_name", help="Name of the pipeline")
         parser.add_argument(
             "--pipeline-root", type=str, default="pipeline_root", help="Folder under which pipeline data will be stored"
@@ -68,6 +76,7 @@ class Parser:
         parser = Parser._create_parser()
         parsed_args = parser.parse_args()
         return CommandLineArgs(
+            should_use_local_sample_data=parsed_args.use_local_sample_data,
             pipeline_name=parsed_args.pipeline_name,
             pipeline_root=parsed_args.pipeline_root,
             metadata_path=parsed_args.metadata_path,

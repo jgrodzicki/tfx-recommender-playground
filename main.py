@@ -19,7 +19,10 @@ def main() -> None:
         pipeline_name=args.pipeline_name,
         pipeline_root=args.pipeline_root,
         metadata_connection_config=sqlite_metadata_connection_config(args.metadata_path),
-        example_gen_parameters=ExampleGenParameters(limit_dataset_size=args.limit_dataset_size),
+        example_gen_parameters=ExampleGenParameters(
+            should_use_local_sample_data=args.should_use_local_sample_data,
+            limit_dataset_size=args.limit_dataset_size,
+        ),
         trainer_parameters=TrainerParameters(
             epochs=args.epochs,
             train_num_steps=args.train_num_steps,

@@ -15,3 +15,4 @@ docker run -it tfx-recommender-playground
 ```bash
 python main.py
 ```
+To run without Kaggle credentials, `--use-local-sample-data` flag can be used.
