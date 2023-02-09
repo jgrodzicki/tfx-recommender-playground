@@ -1,0 +1,36 @@
+name: CI
+
+on: push
+
+jobs:
+  isort:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: pip install -r requirements-dev.txt
+      - run: isort . --check
+
+  flake8:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: pip install -r requirements-dev.txt
+      - run: flake8 .
+
+  mypy:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'  # TFX doesn't support newer
+      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
+      - run: mypy .
+
+  black:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: pip install -r requirements-dev.txt
+      - run: black . --check
