@@ -9,12 +9,10 @@ from src.components.component_parameters import (
 from src.parser import Parser
 from src.pipeline import PipelineFactory
 from src.pipeline_executor import LocalPipelineExecutor
-from src.runner_factory import RunnerFactory
 
 
 def main() -> None:
     args = Parser.parse()
-    runner = RunnerFactory.create_local_dag_runner()
     pipeline = PipelineFactory.create(
         pipeline_name=args.pipeline_name,
         pipeline_root=args.pipeline_root,
@@ -34,7 +32,7 @@ def main() -> None:
         ),
         pusher_parameters=PusherParameters(serving_model_dir=args.serving_model_dir),
     )
-    executor = LocalPipelineExecutor(runner=runner, pipeline=pipeline)
+    executor = LocalPipelineExecutor(pipeline=pipeline)
     executor.execute()
 
 

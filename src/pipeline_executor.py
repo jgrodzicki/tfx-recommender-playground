@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 
-from tfx.orchestration.local.local_dag_runner import LocalDagRunner
 from tfx.orchestration.pipeline import Pipeline
 
 from src.components.common import get_logger
+from src.runner_factory import RunnerFactory
 
 
 class PipelineExecutor(ABC):
@@ -13,9 +13,9 @@ class PipelineExecutor(ABC):
 
 
 class LocalPipelineExecutor(PipelineExecutor):
-    def __init__(self, runner: LocalDagRunner, pipeline: Pipeline) -> None:
-        self._runner = runner
+    def __init__(self, pipeline: Pipeline) -> None:
         self._pipeline = pipeline
+        self._runner = RunnerFactory.create_local_dag_runner()
         self._logger = get_logger(f"{__name__}:{self.__class__.__name__}")
 
     def execute(self) -> None:
