@@ -6,9 +6,9 @@ from src.components.component_parameters import (
     PusherParameters,
     TrainerParameters,
 )
-from src.executor import LocalExecutor
 from src.parser import Parser
 from src.pipeline import PipelineFactory
+from src.pipeline_executor import LocalPipelineExecutor
 from src.runner_factory import RunnerFactory
 
 
@@ -34,7 +34,7 @@ def main() -> None:
         ),
         pusher_parameters=PusherParameters(serving_model_dir=args.serving_model_dir),
     )
-    executor = LocalExecutor(runner=runner, pipeline=pipeline)
+    executor = LocalPipelineExecutor(runner=runner, pipeline=pipeline)
     executor.execute()
 
 

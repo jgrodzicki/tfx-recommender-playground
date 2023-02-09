@@ -6,13 +6,13 @@ from tfx.orchestration.pipeline import Pipeline
 from src.components.common import get_logger
 
 
-class Executor(ABC):
+class PipelineExecutor(ABC):
     @abstractmethod
     def execute(self) -> None:
         pass
 
 
-class LocalExecutor(Executor):
+class LocalPipelineExecutor(PipelineExecutor):
     def __init__(self, runner: LocalDagRunner, pipeline: Pipeline) -> None:
         self._runner = runner
         self._pipeline = pipeline
