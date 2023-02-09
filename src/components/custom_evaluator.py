@@ -13,6 +13,8 @@ from tfx.types.component_spec import ChannelParameter, ComponentSpec, ExecutionP
 from tfx.types.standard_component_specs import BLESSING_KEY, MODEL_KEY, MODEL_RUN_KEY
 from tfx.utils import io_utils
 
+from src.components.common import get_logger
+
 
 class NoMetricFoundError(Exception):
     pass
@@ -23,18 +25,23 @@ METRIC_NAME_FIELD = "metric_name"
 
 
 class Executor(base_executor.BaseExecutor):
+    def __init__(self, context: Any) -> None:
+        super().__init__(context=context)
+        self._logger = get_logger(f"{__name__}:{self.__class__.__name__}")
+
     @staticmethod
     def _get_single_artifact(artifacts: List[Artifact]) -> Artifact:
         return artifact_utils.get_single_instance(artifacts)
 
-    @staticmethod
-    def _retrieve_model_metrics(model_run_uri: str) -> tf.data.TFRecordDataset:
+    def _retrieve_model_metrics(self, model_run_uri: str) -> tf.data.TFRecordDataset:
+        self._logger.info(f"Retrieving model metrics for {model_run_uri}")
         validation_model_run_path = pathlib.Path(model_run_uri, "validation")
         model_metrics_files = list(validation_model_run_path.iterdir())
+        self._logger.info(f"Found following files with metrics: {model_metrics_files}")
         return tf.data.TFRecordDataset(model_metrics_files)
 
-    @staticmethod
-    def _get_latest_eval_metric(model_metrics: tf.data.TFRecordDataset, metric_name: str) -> float:
+    def _get_latest_eval_metric(self, model_metrics: tf.data.TFRecordDataset, metric_name: str) -> float:
+        self._logger.info(f"Getting evaluation metric: {metric_name}")
         last_eval_metric: Optional[float] = None
         for serialized_metric in model_metrics:
             event = event_pb2.Event.FromString(serialized_metric.numpy())
@@ -43,18 +50,21 @@ class Executor(base_executor.BaseExecutor):
                     last_eval_metric = tf.make_ndarray(metric.tensor).item()
         if last_eval_metric is None:
             raise NoMetricFoundError(f"Following metric wasn't found for the trained model: {metric_name}")
+        self._logger.info(f"Found metric: {metric_name} - {last_eval_metric}")
         return last_eval_metric
 
-    @staticmethod
-    def _should_bless_model(metrics_threshold: float, latest_eval_metric: float) -> bool:
-        return latest_eval_metric >= metrics_threshold
+    def _should_bless_model(self, metrics_threshold: float, latest_eval_metric: float) -> bool:
+        should_bless = latest_eval_metric >= metrics_threshold
+        self._logger.info(f"Minimal threshold: {metrics_threshold}. Model {'IS' if should_bless else 'ISNT'} blessed")
+        return should_bless
 
-    @staticmethod
     def _write_blessing_result(
+        self,
         blessing_artifact: Artifact,
         model_artifact: Artifact,
         should_bless_model: bool,
     ) -> None:
+        self._logger.info("Writing blessing results to the artifacts")
         if should_bless_model:
             filename = evaluator_constants.BLESSED_FILE_NAME
             artifact_property_value = evaluator_constants.BLESSED_VALUE

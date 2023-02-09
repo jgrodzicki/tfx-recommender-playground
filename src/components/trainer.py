@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import List, Union
 
@@ -7,7 +8,7 @@ from tensorflow_transform import TFTransformOutput
 from tfx.components.trainer.fn_args_utils import DataAccessor, FnArgs
 from tfx_bsl.public import tfxio
 
-from src.components.common import EPOCHS_CONFIG_FIELD_NAME, RECIPE_NAME_FEATURE, create_vocab_filename
+from src.components.common import EPOCHS_CONFIG_FIELD_NAME, RECIPE_NAME_FEATURE, create_vocab_filename, get_logger
 from src.model import RecommenderModelFactory
 
 MODULE_FILE = os.path.abspath(__file__)
@@ -23,7 +24,9 @@ def _create_dataset(
     data_accessor: DataAccessor,
     tf_transform_output: TFTransformOutput,
     batch_size: int,
+    logger: logging.Logger,
 ) -> tf.data.Dataset:
+    logger.info(f"Creating a dataset from following files: {file_pattern}")
     dataset = data_accessor.tf_dataset_factory(
         file_pattern,
         tfxio.TensorFlowDatasetOptions(batch_size=batch_size),
@@ -41,8 +44,8 @@ def _get_serve_tf_examples_fn(
     @tf.function
     def serve_tf_examples_fn(serialized_tf_examples: tf.string) -> tf.Tensor:
         feature_spec = tf_transform_output.raw_feature_spec()
-        user_id_spec = feature_spec["user_id"]
 
+        user_id_spec = feature_spec["user_id"]
         parsed_features = tf.io.parse_example(serialized_tf_examples, {"user_id": user_id_spec})
 
         transformed_features = model.tft_layer(parsed_features)
@@ -61,6 +64,8 @@ def _create_recipe_dataset(tf_transform_output: TFTransformOutput) -> tf.data.Da
 
 
 def run_fn(fn_args: FnArgs) -> None:
+    logger = get_logger(__name__)
+    logger.info("Running the training")
     tf_transform_output = TFTransformOutput(fn_args.transform_output)
 
     train_dataset = _create_dataset(
@@ -68,12 +73,14 @@ def run_fn(fn_args: FnArgs) -> None:
         data_accessor=fn_args.data_accessor,
         tf_transform_output=tf_transform_output,
         batch_size=TRAIN_BATCH_SIZE,
+        logger=logger,
     )
     eval_dataset = _create_dataset(
         file_pattern=fn_args.eval_files,
         data_accessor=fn_args.data_accessor,
         tf_transform_output=tf_transform_output,
         batch_size=EVAL_BATCH_SIZE,
+        logger=logger,
     )
 
     recipe_dataset = _create_recipe_dataset(tf_transform_output=tf_transform_output)
@@ -108,6 +115,8 @@ def run_fn(fn_args: FnArgs) -> None:
     )
     # Run once so that we can get the right signatures into SavedModel
     _ = index(tf.constant([42]))
+
+    logger.info(f"Saving the model to {fn_args.serving_model_dir}")
 
     serving_func = _get_serve_tf_examples_fn(index, tf_transform_output).get_concrete_function(
         tf.TensorSpec(shape=[None], dtype=tf.string, name="examples")

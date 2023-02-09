@@ -1,10 +1,11 @@
+import logging
 from typing import Dict
 
 import tensorflow as tf
 import tensorflow_recommenders as tfrs
 from tensorflow_transform import TFTransformOutput
 
-from src.components.common import RECIPE_NAME_FEATURE, USER_ID_FEATURE, create_vocab_filename
+from src.components.common import RECIPE_NAME_FEATURE, USER_ID_FEATURE, create_vocab_filename, get_logger
 
 
 class RecommenderModel(tfrs.Model):  # type: ignore[misc]  # Class cannot subclass "Model" (has type "Any")
@@ -37,16 +38,22 @@ class RecommenderModel(tfrs.Model):  # type: ignore[misc]  # Class cannot subcla
 class RecommenderModelFactory:
     EMBEDDING_DIMENSION = 32
 
-    @staticmethod
+    @classmethod
     def create(
+        cls,
         tf_transform_output: TFTransformOutput,
         recipe_dataset: tf.data.Dataset,
     ) -> RecommenderModel:
+        logger = get_logger(f"{__name__}:{cls.__name__}")
+        logger.info("Creating recommender model")
+
         recipe_embedder = RecommenderModelFactory._build_recipe_embedder(
             tf_transform_output=tf_transform_output,
+            logger=logger,
         )
         user_embedder = RecommenderModelFactory._build_user_embedder(
             tf_transform_output=tf_transform_output,
+            logger=logger,
         )
 
         metrics = tfrs.metrics.FactorizedTopK(candidates=recipe_dataset.batch(128).map(recipe_embedder))
@@ -59,9 +66,12 @@ class RecommenderModelFactory:
         )
 
     @staticmethod
-    def _build_user_embedder(tf_transform_output: TFTransformOutput) -> tf.keras.Model:
+    def _build_user_embedder(tf_transform_output: TFTransformOutput, logger: logging.Logger) -> tf.keras.Model:
+        logger.info("Building user id embedder")
+
         unique_ids = tf_transform_output.vocabulary_by_name(vocab_filename=create_vocab_filename(USER_ID_FEATURE))
         unique_ids_str = [b.decode() for b in unique_ids]
+        logger.info(f"Found {len(unique_ids_str)} unique users to build the embedding")
 
         model = tf.keras.Sequential(
             [
@@ -75,8 +85,10 @@ class RecommenderModelFactory:
         return model
 
     @staticmethod
-    def _build_recipe_embedder(tf_transform_output: TFTransformOutput) -> tf.keras.Model:
+    def _build_recipe_embedder(tf_transform_output: TFTransformOutput, logger: logging.Logger) -> tf.keras.Model:
+        logger.info("Building recipe embedder")
         unique_ids = tf_transform_output.vocabulary_by_name(vocab_filename=create_vocab_filename(RECIPE_NAME_FEATURE))
+        logger.info(f"Found {len(unique_ids)} unique recipes to build the embedding")
 
         model = tf.keras.Sequential(
             [

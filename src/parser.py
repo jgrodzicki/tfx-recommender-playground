@@ -1,6 +1,8 @@
 import argparse
 from dataclasses import dataclass
 
+from src.components.common import get_logger
+
 
 @dataclass(frozen=True)
 class CommandLineArgs:
@@ -71,11 +73,14 @@ class Parser:
         )
         return parser
 
-    @staticmethod
-    def parse() -> CommandLineArgs:
+    @classmethod
+    def parse(cls) -> CommandLineArgs:
+        logger = get_logger(f"{__name__}:{cls.__name__}")
+        logger.info("Parsing arguments")
+
         parser = Parser._create_parser()
         parsed_args = parser.parse_args()
-        return CommandLineArgs(
+        args = CommandLineArgs(
             should_use_local_sample_data=parsed_args.use_local_sample_data,
             pipeline_name=parsed_args.pipeline_name,
             pipeline_root=parsed_args.pipeline_root,
@@ -88,3 +93,5 @@ class Parser:
             metric_threshold=parsed_args.metric_threshold,
             serving_model_dir=parsed_args.serving_model_dir,
         )
+        logger.info(f"Parsed arguments: {args}")
+        return args

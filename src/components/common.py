@@ -1,3 +1,5 @@
+import logging
+
 RECIPE_NAME_FEATURE = "name"
 USER_ID_FEATURE = "user_id"
 
@@ -14,3 +16,9 @@ REQUIRED_COLUMNS = NUMERICAL_FEATURES + CATEGORICAL_FEATURES + TEXT_FEATURES + [
 
 def create_vocab_filename(feature_name: str) -> str:
     return "vocabulary_" + feature_name
+
+
+def get_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    return logger
