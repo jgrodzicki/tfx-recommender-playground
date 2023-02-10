@@ -8,15 +8,12 @@ from src.components.common import get_logger
 class CommandLineArgs:
     should_use_local_sample_data: bool
     pipeline_name: str
-    pipeline_root: str
-    metadata_path: str
     limit_dataset_size: int
     train_num_steps: int
     eval_num_steps: int
     epochs: int
     metric_name: str
     metric_threshold: float
-    serving_model_dir: str
 
 
 class Parser:
@@ -31,15 +28,6 @@ class Parser:
             "Kaggle API, credentials have to be stored in the ~/.kaggle/kaggle.json file",
         )
         parser.add_argument("--pipeline-name", type=str, default="pipeline_name", help="Name of the pipeline")
-        parser.add_argument(
-            "--pipeline-root", type=str, default="pipeline_root", help="Folder under which pipeline data will be stored"
-        )
-        parser.add_argument(
-            "--metadata-path",
-            type=str,
-            default="metadata/pipeline_name/metadata.db",
-            help="Path to the file where metadata will be stored",
-        )
         parser.add_argument(
             "--limit-dataset-size",
             type=int,
@@ -65,12 +53,6 @@ class Parser:
             default=0.02,
             help="Minimal threshold for the metric specified above in order to bless the model",
         )
-        parser.add_argument(
-            "--serving-model-dir",
-            type=str,
-            default="serving_model_dir",
-            help="Directory where model will be pushed if good enough for serving",
-        )
         return parser
 
     @classmethod
@@ -83,15 +65,12 @@ class Parser:
         args = CommandLineArgs(
             should_use_local_sample_data=parsed_args.use_local_sample_data,
             pipeline_name=parsed_args.pipeline_name,
-            pipeline_root=parsed_args.pipeline_root,
-            metadata_path=parsed_args.metadata_path,
             limit_dataset_size=parsed_args.limit_dataset_size,
             train_num_steps=parsed_args.train_num_steps,
             eval_num_steps=parsed_args.eval_num_steps,
             epochs=parsed_args.epochs,
             metric_name=parsed_args.metric_name,
             metric_threshold=parsed_args.metric_threshold,
-            serving_model_dir=parsed_args.serving_model_dir,
         )
         logger.info(f"Parsed arguments: {args}")
         return args

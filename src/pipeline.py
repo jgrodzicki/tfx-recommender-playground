@@ -8,15 +8,11 @@ from tfx.components.trainer.component import Trainer
 from tfx.components.transform.component import Transform
 from tfx.orchestration.metadata import ConnectionConfigType
 from tfx.orchestration.pipeline import Pipeline
+from tfx.v1.orchestration.metadata import sqlite_metadata_connection_config
 from tfx.v1.proto import EvalArgs, PushDestination, TrainArgs
 
 from src.components.common import EPOCHS_CONFIG_FIELD_NAME
-from src.components.component_parameters import (
-    EvaluatorParameters,
-    ExampleGenParameters,
-    PusherParameters,
-    TrainerParameters,
-)
+from src.components.component_parameters import EvaluatorParameters, ExampleGenParameters, TrainerParameters
 from src.components.custom_evaluator import CustomEvaluator
 from src.components.custom_example_gen import CustomExampleGen
 from src.components.trainer import MODULE_FILE as TRAINER_MODULE_FILE
@@ -24,6 +20,18 @@ from src.components.transform import MODULE_FILE as TRANSFORM_MODULE_FILE
 
 
 class PipelineFactory:
+    @staticmethod
+    def _get_pipeline_root(pipeline_name: str) -> str:
+        return f"pipeline_root/{pipeline_name}"
+
+    @staticmethod
+    def _get_metadata_connection_config() -> ConnectionConfigType:
+        return sqlite_metadata_connection_config("metadata/pipeline_name/metadata.db")
+
+    @staticmethod
+    def _get_pusher_push_destination() -> PushDestination:
+        return PushDestination(filesystem=PushDestination.Filesystem(base_directory="serving_model_dir"))
+
     @staticmethod
     def _create_example_gen(example_gen_parameters: ExampleGenParameters) -> CustomExampleGen:
         return CustomExampleGen(
@@ -72,24 +80,19 @@ class PipelineFactory:
         )
 
     @staticmethod
-    def _create_pusher(trainer: Trainer, evaluator: CustomEvaluator, pusher_parameters: PusherParameters) -> Pusher:
+    def _create_pusher(trainer: Trainer, evaluator: CustomEvaluator, push_destination: PushDestination) -> Pusher:
         return Pusher(
             model=trainer.outputs["model"],
             model_blessing=evaluator.outputs["blessing"],
-            push_destination=PushDestination(
-                filesystem=PushDestination.Filesystem(base_directory=pusher_parameters.serving_model_dir),
-            ),
+            push_destination=push_destination,
         )
 
     @staticmethod
     def create(
         pipeline_name: str,
-        pipeline_root: str,
-        metadata_connection_config: ConnectionConfigType,
         example_gen_parameters: ExampleGenParameters,
         trainer_parameters: TrainerParameters,
         evaluator_parameters: EvaluatorParameters,
-        pusher_parameters: PusherParameters,
     ) -> Pipeline:
         example_gen = PipelineFactory._create_example_gen(example_gen_parameters=example_gen_parameters)
 
@@ -112,14 +115,14 @@ class PipelineFactory:
         pusher = PipelineFactory._create_pusher(
             trainer=trainer,
             evaluator=evaluator,
-            pusher_parameters=pusher_parameters,
+            push_destination=PipelineFactory._get_pusher_push_destination(),
         )
 
         components: List[BaseNode] = [example_gen, statistics_gen, schema_gen, transform, trainer, evaluator, pusher]
 
         return Pipeline(
             pipeline_name=pipeline_name,
-            pipeline_root=pipeline_root,
-            metadata_connection_config=metadata_connection_config,
+            pipeline_root=PipelineFactory._get_pipeline_root(pipeline_name=pipeline_name),
+            metadata_connection_config=PipelineFactory._get_metadata_connection_config(),
             components=components,
         )
