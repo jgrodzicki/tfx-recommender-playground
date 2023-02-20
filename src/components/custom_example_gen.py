@@ -10,7 +10,6 @@ from tfx.types import artifact_utils, standard_artifacts
 from tfx.types.artifact import Artifact, Property, PropertyType
 from tfx.types.channel import Channel
 from tfx.types.component_spec import ChannelParameter, ComponentSpec, ExecutionParameter
-from tfx.types.standard_artifacts import _TfxArtifact
 from tqdm import tqdm
 
 from src.components.common import REQUIRED_COLUMNS, get_logger
@@ -113,8 +112,9 @@ class Executor(base_executor.BaseExecutor):
 
     def _set_size_artifact(self, size_artifact: Artifact, train_df_size: int, eval_df_size: int) -> None:
         self._logger.info(f"Setting SizeArtifact - train: {train_df_size}, eval: {eval_df_size}")
-        size_artifact.train = train_df_size
-        size_artifact.eval = eval_df_size
+
+        size_artifact.set_json_value_custom_property("train", train_df_size)
+        size_artifact.set_json_value_custom_property("eval", eval_df_size)
 
     @staticmethod
     def _set_examples_artifact(examples_artifact: Artifact) -> None:
@@ -169,21 +169,25 @@ class Executor(base_executor.BaseExecutor):
         )
 
 
-class SizeArtifact(_TfxArtifact):
-    """
-    Artifact introduced just as an example. Could be retrieved e.g. using ML Metadata:
-    > import ml_metadata as mlmd
-
-    > metadata_connection_config=sqlite_metadata_connection_config(path_to_metadata_db_file)
-    > store = mlmd.MetadataStore(metadata_connection_config)
-    > store.get_artifacts_by_type(SizeArtifact.TYPE_NAME)
-    """
-
-    TYPE_NAME: str = "SizeArtifact"  # type: ignore[assignment]  # In base class defined as `None`
-    PROPERTIES = {
-        "train": SIZE_PROPERTY,
-        "eval": SIZE_PROPERTY,
-    }  # type: ignore[assignment]  # In base class defined as `None`
+# Not using SizeArtifact as it's not supported by KubeflowV2DagRunner,
+# https://github.com/tensorflow/tfx/blob/r1.12.0/tfx/orchestration/kubeflow/v2/compiler_utils.py#L51
+#
+# class SizeArtifact(standard_artifacts.JsonValue):
+#     """
+#     Artifact introduced just as an example. Could be retrieved e.g. using ML Metadata:
+#     > import ml_metadata as mlmd
+#     > from tfx.orchestration.metadata import sqlite_metadata_connection_config
+#
+#     > metadata_connection_config=sqlite_metadata_connection_config(path_to_metadata_db_file)
+#     > store = mlmd.MetadataStore(metadata_connection_config)
+#     > store.get_artifacts_by_type(SizeArtifact.TYPE_NAME)
+#     """
+#
+#     TYPE_NAME: str = "SizeArtifact"  # type: ignore[assignment]  # In base class defined as `None`
+#     PROPERTIES = {
+#         "train": SIZE_PROPERTY,
+#         "eval": SIZE_PROPERTY,
+#     }  # type: ignore[assignment]  # In base class defined as `None`
 
 
 class CustomExampleGenSpec(ComponentSpec):  # type: ignore[no-untyped-call]
@@ -194,7 +198,7 @@ class CustomExampleGenSpec(ComponentSpec):  # type: ignore[no-untyped-call]
     INPUTS = {}
     OUTPUTS = {
         SpecFields.EXAMPLES: ChannelParameter(type=standard_artifacts.Examples),
-        SpecFields.SIZE: ChannelParameter(type=SizeArtifact),
+        SpecFields.SIZE: ChannelParameter(type=standard_artifacts.JsonValue),
     }
 
 
@@ -208,7 +212,7 @@ class CustomExampleGen(base_component.BaseComponent):
                 SpecFields.SHOULD_USE_LOCAL_SAMPLE_DATA: should_use_local_sample_data,
                 SpecFields.LIMIT_DATASET_SIZE: limit_dataset_size,
                 SpecFields.EXAMPLES: Channel(type=standard_artifacts.Examples),
-                SpecFields.SIZE: Channel(type=SizeArtifact),
+                SpecFields.SIZE: Channel(type=standard_artifacts.JsonValue),
             }
         )  # type: ignore[no-untyped-call]
         super().__init__(spec=spec)
