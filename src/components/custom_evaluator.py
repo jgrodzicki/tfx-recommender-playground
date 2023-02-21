@@ -1,8 +1,10 @@
 import os
 import pathlib
-from typing import Any, Dict, List, Optional
+import tempfile
+from typing import Any, Dict, List, Optional, Union
 
 import tensorflow as tf
+from google.cloud import storage  # type: ignore[attr-defined]
 from tensorflow.core.util import event_pb2
 from tfx.components.evaluator import constants as evaluator_constants
 from tfx.dsl.components.base import base_component, base_executor, executor_spec
@@ -33,23 +35,69 @@ class Executor(base_executor.BaseExecutor):
     def _get_single_artifact(artifacts: List[Artifact]) -> Artifact:
         return artifact_utils.get_single_instance(artifacts)
 
-    def _retrieve_model_metrics(self, model_run_uri: str) -> tf.data.TFRecordDataset:
-        self._logger.info(f"Retrieving model metrics for {model_run_uri}")
-        validation_model_run_path = pathlib.Path(model_run_uri, "validation")
-        model_metrics_files = list(validation_model_run_path.iterdir())
-        self._logger.info(f"Found following files with metrics: {model_metrics_files}")
-        return tf.data.TFRecordDataset(model_metrics_files)
+    def _retrieve_latest_eval_metric_from_local(self, validation_folder_path: str, metric_name: str) -> float:
+        metrics_files = list(pathlib.Path(validation_folder_path).iterdir())
+        self._logger.info(f"Found following local files with metrics: {metrics_files}")
+        metric = self._get_latest_metric_from_files(metric_files=metrics_files, metric_name=metric_name)
+        return metric
 
-    def _get_latest_eval_metric(self, model_metrics: tf.data.TFRecordDataset, metric_name: str) -> float:
+    def _retrieve_latest_eval_metric_from_gcs(self, validation_folder_path: str, metric_name: str) -> float:
+        uri_split = validation_folder_path.split("/")
+        bucket_name = uri_split[2]
+        prefix = "/".join(uri_split[3:])
+
+        client = storage.Client()
+        bucket = client.get_bucket(bucket_or_name=bucket_name)
+        blobs = bucket.list_blobs(prefix=prefix)
+        blob_list = list(blobs)  # Convert to avoid `Iterator has already started` error
+        blob_list = blob_list[1:]  # Ugly way to get rid of the folder listed as a blob
+        self._logger.info(f"Found following files in bucket: {bucket.name} - {[b.name for b in blob_list]}")
+
+        with tempfile.TemporaryDirectory() as tmp_dir_name:
+            metric_files = []
+            for blob in blob_list:
+                self._logger.info(f"Downloading: {blob.name}")
+                filename = blob.name.replace("/", "_")
+                path = f"{tmp_dir_name}/{filename}"
+
+                blob.download_to_filename(path)
+                metric_files.append(path)
+
+            metric = self._get_latest_metric_from_files(metric_files=metric_files, metric_name=metric_name)
+        return metric
+
+    def _retrieve_latest_eval_metric(self, model_run_uri: str, metric_name: str) -> float:
+        self._logger.info(f"Retrieving model metrics for {model_run_uri}")
+        validation_folder_path = f"{model_run_uri}/validation"
+        if model_run_uri.startswith("gs://"):
+            return self._retrieve_latest_eval_metric_from_gcs(
+                validation_folder_path=validation_folder_path,
+                metric_name=metric_name,
+            )
+        else:
+            return self._retrieve_latest_eval_metric_from_local(
+                validation_folder_path=validation_folder_path,
+                metric_name=metric_name,
+            )
+
+    def _get_latest_metric_from_files(
+        self,
+        metric_files: Union[List[str], List[pathlib.Path]],
+        metric_name: str,
+    ) -> float:
         self._logger.info(f"Getting evaluation metric: {metric_name}")
         last_eval_metric: Optional[float] = None
-        for serialized_metric in model_metrics:
+        metrics_dataset = tf.data.TFRecordDataset(metric_files)
+
+        for serialized_metric in metrics_dataset:
             event = event_pb2.Event.FromString(serialized_metric.numpy())
             for metric in event.summary.value:
                 if metric.tag == metric_name:
                     last_eval_metric = tf.make_ndarray(metric.tensor).item()
+
         if last_eval_metric is None:
             raise NoMetricFoundError(f"Following metric wasn't found for the trained model: {metric_name}")
+
         self._logger.info(f"Found metric: {metric_name} - {last_eval_metric}")
         return last_eval_metric
 
@@ -97,9 +145,8 @@ class Executor(base_executor.BaseExecutor):
         exec_properties: Dict[str, Any],
     ) -> None:
         model_run_artifact = self._get_single_artifact(artifacts=input_dict[MODEL_RUN_KEY])
-        model_metrics = self._retrieve_model_metrics(model_run_uri=model_run_artifact.uri)
-        latest_eval_metric = self._get_latest_eval_metric(
-            model_metrics=model_metrics,
+        latest_eval_metric = self._retrieve_latest_eval_metric(
+            model_run_uri=model_run_artifact.uri,
             metric_name=exec_properties[METRIC_NAME_FIELD],
         )
 

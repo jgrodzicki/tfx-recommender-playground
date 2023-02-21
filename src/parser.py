@@ -1,11 +1,21 @@
 import argparse
 from dataclasses import dataclass
+from enum import Enum
 
 from src.components.common import get_logger
 
 
+class RunnerEnv(Enum):
+    LOCAL = "local"
+    VERTEX_AI = "vertex_ai"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 @dataclass(frozen=True)
 class CommandLineArgs:
+    runner_env: RunnerEnv
     should_use_local_sample_data: bool
     pipeline_name: str
     limit_dataset_size: int
@@ -21,13 +31,21 @@ class Parser:
     def _create_parser() -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser()
         parser.add_argument(
+            "--runner-env",
+            type=RunnerEnv,
+            choices=list(RunnerEnv),
+            required=True,
+            help="Specifies an env where pipeline is ran. Note: When set to VertexAI, you have to set following env "
+            "variables: GOOGLE_CLOUD_PROJECT",
+        )
+        parser.add_argument(
             "--use-local-sample-data",
             action="store_true",
             help="Specifies source of the data used. When the flag is provided, a small sample stored locally in the "
             "repo will be used. Otherwise the data will get fetched from Kaggle. Note: In order to fetch from "
             "Kaggle API, credentials have to be stored in the ~/.kaggle/kaggle.json file",
         )
-        parser.add_argument("--pipeline-name", type=str, default="pipeline_name", help="Name of the pipeline")
+        parser.add_argument("--pipeline-name", type=str, default="pipeline-name", help="Name of the pipeline")
         parser.add_argument(
             "--limit-dataset-size",
             type=int,
@@ -63,6 +81,7 @@ class Parser:
         parser = Parser._create_parser()
         parsed_args = parser.parse_args()
         args = CommandLineArgs(
+            runner_env=parsed_args.runner_env,
             should_use_local_sample_data=parsed_args.use_local_sample_data,
             pipeline_name=parsed_args.pipeline_name,
             limit_dataset_size=parsed_args.limit_dataset_size,

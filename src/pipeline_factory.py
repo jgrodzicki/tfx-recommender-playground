@@ -1,4 +1,5 @@
-from typing import List
+import os
+from typing import List, Optional
 
 from tfx.components.base.base_node import BaseNode
 from tfx.components.pusher.component import Pusher
@@ -17,20 +18,37 @@ from src.components.custom_evaluator import CustomEvaluator
 from src.components.custom_example_gen import CustomExampleGen
 from src.components.trainer import MODULE_FILE as TRAINER_MODULE_FILE
 from src.components.transform import MODULE_FILE as TRANSFORM_MODULE_FILE
+from src.parser import RunnerEnv
+
+GCS_BUCKET_NAME_ENV = "GCS_BUCKET_NAME"
 
 
 class PipelineFactory:
     @staticmethod
-    def _get_pipeline_root(pipeline_name: str) -> str:
-        return f"pipeline_root/{pipeline_name}"
+    def _get_pipeline_root(runner_env: RunnerEnv, pipeline_name: str) -> str:
+        pipeline_root = f"pipeline_root/{pipeline_name}"
+        if runner_env is RunnerEnv.VERTEX_AI:
+            gcs_bucket_name = os.environ[GCS_BUCKET_NAME_ENV]
+            pipeline_root_prefix = f"gs://{gcs_bucket_name}/"
+            pipeline_root = pipeline_root_prefix + pipeline_root
+
+        return pipeline_root
 
     @staticmethod
-    def _get_metadata_connection_config() -> ConnectionConfigType:
-        return sqlite_metadata_connection_config("metadata/pipeline_name/metadata.db")
+    def _get_metadata_connection_config(runner_env: RunnerEnv) -> Optional[ConnectionConfigType]:
+        if runner_env is RunnerEnv.LOCAL:
+            return sqlite_metadata_connection_config("metadata/pipeline_name/metadata.db")
+        return None
 
     @staticmethod
-    def _get_pusher_push_destination() -> PushDestination:
-        return PushDestination(filesystem=PushDestination.Filesystem(base_directory="serving_model_dir"))
+    def _get_pusher_push_destination(runner_env: RunnerEnv) -> PushDestination:
+        base_directory = "serving_model_dir"
+        if runner_env is RunnerEnv.VERTEX_AI:
+            gcs_bucket_name = os.environ[GCS_BUCKET_NAME_ENV]
+            dir_prefix = f"gs://{gcs_bucket_name}/"
+            base_directory = dir_prefix + base_directory
+
+        return PushDestination(filesystem=PushDestination.Filesystem(base_directory=base_directory))
 
     @staticmethod
     def _create_example_gen(example_gen_parameters: ExampleGenParameters) -> CustomExampleGen:
@@ -90,6 +108,7 @@ class PipelineFactory:
     @staticmethod
     def create(
         pipeline_name: str,
+        runner_env: RunnerEnv,
         example_gen_parameters: ExampleGenParameters,
         trainer_parameters: TrainerParameters,
         evaluator_parameters: EvaluatorParameters,
@@ -100,29 +119,23 @@ class PipelineFactory:
 
         schema_gen = PipelineFactory._create_schema_gen(statistics_gen=statistics_gen)
 
-        transform = PipelineFactory._create_transform(
-            example_gen=example_gen,
-            schema_gen=schema_gen,
-        )
+        transform = PipelineFactory._create_transform(example_gen=example_gen, schema_gen=schema_gen)
 
         trainer = PipelineFactory._create_trainer(transform=transform, trainer_parameters=trainer_parameters)
 
-        evaluator = PipelineFactory._create_evaluator(
-            trainer=trainer,
-            evaluator_parameters=evaluator_parameters,
-        )
+        evaluator = PipelineFactory._create_evaluator(trainer=trainer, evaluator_parameters=evaluator_parameters)
 
         pusher = PipelineFactory._create_pusher(
             trainer=trainer,
             evaluator=evaluator,
-            push_destination=PipelineFactory._get_pusher_push_destination(),
+            push_destination=PipelineFactory._get_pusher_push_destination(runner_env=runner_env),
         )
 
         components: List[BaseNode] = [example_gen, statistics_gen, schema_gen, transform, trainer, evaluator, pusher]
 
         return Pipeline(
             pipeline_name=pipeline_name,
-            pipeline_root=PipelineFactory._get_pipeline_root(pipeline_name=pipeline_name),
-            metadata_connection_config=PipelineFactory._get_metadata_connection_config(),
+            pipeline_root=PipelineFactory._get_pipeline_root(runner_env=runner_env, pipeline_name=pipeline_name),
+            metadata_connection_config=PipelineFactory._get_metadata_connection_config(runner_env=runner_env),
             components=components,
         )

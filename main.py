@@ -1,13 +1,14 @@
 from src.components.component_parameters import EvaluatorParameters, ExampleGenParameters, TrainerParameters
 from src.parser import Parser
-from src.pipeline import PipelineFactory
-from src.pipeline_executor import LocalPipelineExecutor
+from src.pipeline_executor import PipelineExecutorFactory
+from src.pipeline_factory import PipelineFactory
 
 
 def main() -> None:
     args = Parser.parse()
     pipeline = PipelineFactory.create(
         pipeline_name=args.pipeline_name,
+        runner_env=args.runner_env,
         example_gen_parameters=ExampleGenParameters(
             should_use_local_sample_data=args.should_use_local_sample_data,
             limit_dataset_size=args.limit_dataset_size,
@@ -22,7 +23,7 @@ def main() -> None:
             metric_threshold=args.metric_threshold,
         ),
     )
-    executor = LocalPipelineExecutor(pipeline=pipeline)
+    executor = PipelineExecutorFactory.create(runner_env=args.runner_env, pipeline=pipeline)
     executor.execute()
 
 
