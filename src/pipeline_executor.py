@@ -32,10 +32,12 @@ class VertexAIPipelineExecutor(PipelineExecutor):
         pipeline: Pipeline,
         google_cloud_project: str,
         google_cloud_region: str,
+        gcp_artifact_registry_docker_tag: str,
     ) -> None:
         self._runner = RunnerFactory.create_kubeflow_dag_runner(
             output_filename=pipeline.pipeline_name + "_pipeline.json",
             google_cloud_project=google_cloud_project,
+            gcp_artifact_registry_docker_tag=gcp_artifact_registry_docker_tag,
         )
         self._pipeline = pipeline
         self._google_cloud_project = google_cloud_project
@@ -66,10 +68,13 @@ class PipelineExecutorFactory:
         elif runner_env is RunnerEnv.VERTEX_AI:
             google_cloud_project = os.environ["GOOGLE_CLOUD_PROJECT"]
             google_cloud_region = os.environ["CLOUD_ML_REGION"]
+            gcp_artifact_registry_docker_tag = os.environ["GCP_ARTIFACT_REGISTRY_DOCKER_TAG"]
+
             return VertexAIPipelineExecutor(
                 pipeline=pipeline,
                 google_cloud_project=google_cloud_project,
                 google_cloud_region=google_cloud_region,
+                gcp_artifact_registry_docker_tag=gcp_artifact_registry_docker_tag,
             )
 
         else:
