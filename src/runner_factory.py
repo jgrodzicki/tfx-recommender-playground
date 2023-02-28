@@ -8,14 +8,21 @@ class RunnerFactory:
         return LocalDagRunner()  # type: ignore[no-untyped-call]
 
     @staticmethod
-    def create_kubeflow_dag_runner(output_filename: str, google_cloud_project: str) -> KubeflowV2DagRunner:
+    def create_kubeflow_dag_runner(
+        output_filename: str,
+        google_cloud_project: str,
+        gcp_artifact_registry_docker_tag: str,
+    ) -> KubeflowV2DagRunner:
         artifact_registry_region = "europe-central2"
         repo_name = "tfx-recommender-playground"
         image_name = "image"
-        tag = "master"
-        image = f"{artifact_registry_region}-docker.pkg.dev/{google_cloud_project}/{repo_name}/{image_name}:{tag}"
+
+        docker_image = (
+            f"{artifact_registry_region}-docker.pkg.dev/{google_cloud_project}/{repo_name}/"
+            f"{image_name}:{gcp_artifact_registry_docker_tag}"
+        )
 
         return KubeflowV2DagRunner(
-            config=KubeflowV2DagRunnerConfig(default_image=image),
+            config=KubeflowV2DagRunnerConfig(default_image=docker_image),
             output_filename=output_filename,
         )

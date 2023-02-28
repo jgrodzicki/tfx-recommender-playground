@@ -12,8 +12,13 @@ COPY sample_data sample_data
 COPY src src
 COPY main.py main.py
 
-ENV GCS_BUCKET_NAME="tfx-recommender-artifacts"
-ENV GOOGLE_CLOUD_PROJECT="tfx-recommender-playground"
+ARG gcs_bucket_name="tfx-recommender-artifacts"
+ARG google_cloud_project="tfx-recommender-playground"
+ARG gcp_artifact_registry_docker_tag="master"
+
+ENV GCS_BUCKET_NAME=$gcs_bucket_name
+ENV GOOGLE_CLOUD_PROJECT=$google_cloud_project
+ENV GCP_ARTIFACT_REGISTRY_DOCKER_TAG=$gcp_artifact_registry_docker_tag
 
 CMD ["--runner-env", "local", "--use-local-sample-data"]
 ENTRYPOINT ["python", "main.py"]
